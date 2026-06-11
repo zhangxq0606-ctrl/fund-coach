@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fund Coach — 基金定投智能教练</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { background: #f5f7fa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1f2937; }
+
+    /* SPA container */
+    .app-container { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #fff; position: relative; }
+
+    /* page containers */
+    [data-page] { display: none; padding: 20px; }
+    [data-page].active { display: block; }
+
+    /* back button */
+    .back-btn { display: inline-flex; align-items: center; gap: 4px; color: #2563eb; cursor: pointer; font-size: 14px; padding: 4px 0; margin-bottom: 16px; background: none; border: none; }
+    .back-btn:hover { color: #1d4ed8; }
+
+    /* holdings */
+    .holding-row { display: flex; align-items: center; gap: 6px; padding: 10px 0; border-bottom: 1px solid #f3f4f6; flex-wrap: wrap; }
+    .holding-row input[type="text"] { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px; font-size: 14px; width: 100px; }
+    .holding-row input[type="number"] { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px; font-size: 14px; width: 80px; }
+    .holding-row select { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 4px; font-size: 13px; }
+    .holding-row .del-btn { color: #ef4444; cursor: pointer; font-size: 20px; line-height: 1; padding: 0 4px; user-select: none; }
+    .holding-row .del-btn:hover { color: #dc2626; }
+
+    #add-form { display: flex; align-items: center; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+    #add-form input[type="text"] { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px; font-size: 14px; width: 100px; }
+    #add-form input[type="number"] { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px; font-size: 14px; width: 80px; }
+    #add-form select { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 4px; font-size: 13px; }
+
+    /* chat page layout */
+    .chat-page { flex-direction: column; height: calc(100vh - 40px); padding: 0; }
+    .chat-page.active { display: flex; }
+    .chat-header { flex-shrink: 0; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; background: #fff; }
+    .chat-header-top { display: flex; align-items: center; justify-content: space-between; }
+    .chat-header-left { display: flex; align-items: center; gap: 8px; }
+    .chat-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+    .input-area { flex-shrink: 0; border-top: 1px solid #e5e7eb; background: #fff; padding: 12px 16px; }
+    .chat-page .back-btn { margin-bottom: 0; }
+
+    /* chat bubbles */
+    .bubble-ai { align-self: flex-start; background: #e9eef4; color: #1f2937; border-radius: 16px 16px 16px 4px; max-width: 80%; padding: 10px 14px; line-height: 1.6; font-size: 14px; }
+    .bubble-user { align-self: flex-end; background: #2563eb; color: #fff; border-radius: 16px 16px 4px 16px; max-width: 80%; padding: 10px 14px; line-height: 1.6; font-size: 14px; }
+    .bubble-ai p { margin: 0 0 6px; }
+    .bubble-ai p:last-child { margin-bottom: 0; }
+    .bubble-ai table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 13px; }
+    .bubble-ai th, .bubble-ai td { border: 1px solid #d1d5db; padding: 4px 8px; text-align: left; }
+    .bubble-ai th { background: #d1d9e6; font-weight: 600; }
+    .bubble-ai ul, .bubble-ai ol { margin: 4px 0; padding-left: 20px; }
+    .bubble-ai li { margin-bottom: 2px; }
+    .bubble-ai strong { font-weight: 600; }
+    .bubble-ai hr { border: none; border-top: 1px solid #d1d5db; margin: 8px 0; }
+    .loading-dots::after { content: ''; display: inline-block; animation: dots 1.2s steps(3, end) infinite; }
+    @keyframes dots { 0% { content: ''; } 33% { content: '.'; } 66% { content: '..'; } 100% { content: '...'; } }
+    .chat-area::-webkit-scrollbar { width: 4px; }
+    .chat-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+    /* button base */
+    .btn-primary { background: #2563eb; color: #fff; border: none; border-radius: 12px; padding: 14px 32px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-primary:hover { background: #1d4ed8; }
+
+    .btn-secondary { background: #f3f4f6; color: #1f2937; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 24px; font-size: 15px; cursor: pointer; transition: background 0.15s; }
+    .btn-secondary:hover { background: #e5e7eb; }
+
+    .btn-sm { background: #2563eb; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+    .btn-sm:hover { background: #1d4ed8; }
+
+    /* section divider */
+    .hr-section { border-top: 2px solid #e5e7eb; margin: 16px 0 12px; }
+
+    /* inline add form per section */
+    .inline-add-form { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; flex-wrap: wrap; }
+    .inline-add-form input[type="text"] { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px; font-size: 13px; width: 80px; }
+    .inline-add-form input[type="number"] { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px; font-size: 13px; width: 70px; }
+    .inline-add-form select { border: 1px solid #d1d5db; border-radius: 6px; padding: 5px 4px; font-size: 12px; }
+
+    /* quick action chips */
+    .chip-btn { flex-shrink: 0; background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; transition: background 0.12s, border-color 0.12s; }
+    .chip-btn:hover { background: #e5e7eb; border-color: #d1d5db; color: #1f2937; }
+
+    .disclaimer { text-align: center; font-size: 11px; color: #9ca3af; padding: 20px 20px 12px; line-height: 1.6; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+    /* welcome prompt banner */
+    .welcome-prompt { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin: 16px; text-align: center; font-size: 14px; line-height: 1.6; color: #1e40af; }
+    .welcome-prompt .wp-btn-skip { background: #e5e7eb; color: #374151; border: none; border-radius: 8px; padding: 8px 20px; font-size: 14px; cursor: pointer; }
+    .welcome-prompt .wp-btn-skip:hover { background: #d1d5db; }
+
+    /* eval */
+    .eval-area { display: flex; flex-direction: column; gap: 10px; }
+    .eval-bubble-ai { background: #e9eef4; color: #1f2937; border-radius: 16px 16px 16px 4px; max-width: 85%; padding: 10px 14px; font-size: 14px; line-height: 1.6; }
+    .eval-input-row { display: flex; gap: 6px; margin-top: 4px; }
+    .eval-input-row input { flex: 1; border: 1px solid #d1d5db; border-radius: 999px; padding: 8px 14px; font-size: 13px; outline: none; }
+    .eval-input-row input:focus { border-color: #2563eb; }
+    .eval-input-row button { background: #2563eb; color: #fff; border: none; border-radius: 999px; padding: 8px 18px; font-size: 13px; cursor: pointer; }
+    .eval-input-row button:hover { background: #1d4ed8; }
+    .eval-loading { display: flex; align-items: center; gap: 6px; padding: 8px 0; }
+    .eval-dot { width: 6px; height: 6px; background: #9ca3af; border-radius: 50%; animation: evalPulse 1.2s ease-in-out infinite; }
+    .eval-dot:nth-child(2) { animation-delay: 0.2s; }
+    .eval-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes evalPulse { 0%,80%,100% { opacity:0.3;transform:scale(0.8); } 40% { opacity:1;transform:scale(1.2); } }
+
+    /* score bar */
+    .score-bar-wrap { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+    .score-bar-bg { flex: 1; height: 8px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
+    .score-bar-fill { height: 100%; border-radius: 999px; transition: width 0.4s; }
+    .score-bar-label { font-size: 13px; white-space: nowrap; min-width: 48px; text-align: right; }
+
+    /* education collapsible */
+    .edu-section { border-top: 2px solid #e5e7eb; padding-top: 12px; margin-top: 12px; }
+    .edu-toggle { cursor: pointer; user-select: none; }
+    .edu-toggle:hover { color: #2563eb; }
+    .edu-toggle::before { content: '▶ '; font-size: 11px; }
+    .edu-toggle.open::before { content: '▼ '; }
+    .edu-body { display: block; }
+    .edu-body.collapsed { display: none; }
+    .edu-card { margin-bottom: 12px; }
+    .edu-card h4 { font-weight: 600; color: #1f2937; margin-bottom: 4px; font-size: 14px; }
+    .edu-card p { margin-bottom: 4px; }
+    .edu-card ul { list-style: disc; padding-left: 18px; margin: 2px 0 4px; }
+    .edu-card li { margin-bottom: 2px; }
+
+    @media (max-width: 480px) {
+      [data-page] { padding: 16px; }
+      .holding-row input[type="text"] { width: 80px; }
+    }
+
+    /* drawer overlay */
+    .drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 40; }
+    .drawer-overlay.open { display: block; }
+
+    /* drawer */
+    .drawer { position: fixed; top: 0; right: -320px; width: 300px; height: 100%; background: #fff; z-index: 50; transition: right 0.25s ease; display: flex; flex-direction: column; box-shadow: -2px 0 12px rgba(0,0,0,0.1); }
+    .drawer.open { right: 0; }
+    .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+    .drawer-new-btn { margin: 12px 16px; padding: 10px; background: #f3f4f6; border: 1px dashed #d1d5db; border-radius: 8px; text-align: center; font-size: 14px; color: #374151; cursor: pointer; flex-shrink: 0; }
+    .drawer-new-btn:hover { background: #e5e7eb; }
+    .drawer-list { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+    .drawer-item { padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; color: #374151; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
+    .drawer-item:hover { background: #f3f4f6; }
+    .drawer-item.active { background: #eff6ff; color: #2563eb; font-weight: 500; }
+    .drawer-item .del { color: #9ca3af; font-size: 16px; padding: 0 4px; cursor: pointer; }
+    .drawer-item .del:hover { color: #ef4444; }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- ========== Page: Home (#/) ========== -->
+  <div data-page="home" class="active">
+    <!-- Title -->
+    <div class="text-center pt-8 pb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Fund Coach</h1>
+      <p class="text-sm text-gray-500 mt-1">基金定投智能教练</p>
+    </div>
+
+    <!-- Nav buttons -->
+    <div class="flex flex-col gap-3 px-4 mb-6">
+      <button class="btn-secondary w-full text-center" data-nav="#/education">📖 基金定投科普</button>
+      <button class="btn-secondary w-full text-center" data-nav="#/profile">📊 投资画像</button>
+      <button class="btn-secondary w-full text-center" data-nav="#/holdings">📋 持仓管理</button>
+    </div>
+
+    <!-- Chat button -->
+    <div class="text-center px-4 mb-8">
+      <button class="btn-primary w-full text-center text-lg py-4" data-nav="#/chat">💬 进入对话</button>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">本工具仅供学习交流，不构成投资建议。基金有风险，投资需谨慎。</div>
+  </div>
+
+  <!-- ========== Page: Education (#/education) ========== -->
+  <div data-page="education">
+    <button class="back-btn" data-nav="#/">← 返回</button>
+    <h2 class="text-lg font-bold text-gray-900 mb-4">📖 基金定投科普</h2>
+
+    <div class="text-sm text-gray-700 leading-relaxed">
+
+      <!-- 定投核心理念 -->
+      <div class="edu-section">
+        <h3 class="edu-toggle open text-base font-bold text-gray-900 mb-2" onclick="toggleEdu(this)">定投核心理念</h3>
+        <div class="edu-body">
+
+          <div class="edu-card">
+            <h4>A | 时间的力量</h4>
+            <p>定投不是靠判断涨跌赚钱，而是靠时间积累资产。不预测市场，只做两件事——定期买入 + 长期持有。复利在 3 年内看不出效果，放在 10 年以上的尺度上才有数量级的差距。定投是让时间替你打工，不是让你替市场算命。</p>
+          </div>
+
+          <div class="edu-card">
+            <h4>B | 波动即机会</h4>
+            <p>跌了才有便宜份额可买，涨了才能获利。没有波动，定投就没有超额收益的来源。核心是纪律——跌了不停投，涨了不追高，才是真正的定投。市场恐慌时你在积累份额，市场狂热时你收获果实。</p>
+          </div>
+
+          <div class="edu-card">
+            <h4>C | 稳中求进</h4>
+            <p>核心仓买确定性（宽基指数 = 买国运），卫星仓探索可能性（小仓试错产业趋势）。不求收益最大化，只求舒服地长期在场。不需要研究 K 线、不需要盯盘，指数基金已经把专业投资者的门槛拉平了——这是对学生群体最重要的理念。</p>
+          </div>
+
+          <div class="edu-card">
+            <h4>D | 长期主义是概率，不是熬</h4>
+            <p>人无法预测短期，既然猜不中，不如放弃择时。把时间拉长到 10 年以上，胜率无限接近 100%。长期持有不是煎熬，而是概率上的最优解。</p>
+          </div>
+
+          <div class="edu-card">
+            <h4>E | 被动比主动更聪明</h4>
+            <p>普通投资者最常犯的错误是"太努力"——频繁看盘、追涨杀跌，收益反而不如一动不动。定投宽基指数的精髓是承认市场不可预测，以不做什么代替做什么。</p>
+          </div>
+
+          <div class="edu-card">
+            <h4>F | 够了就好</h4>
+            <p>定投的目标不是收益最大化，而是在合理时间内积累一笔可观的资产。追求超额收益反而容易追涨杀跌、偏离轨道。舒服地长期在场，比搏命更重要。</p>
+          </div>
+
+          <div class="edu-card">
+            <h4>G | 金钱的终极价值是自由</h4>
+            <p>每月少花一杯奶茶的钱去定投，不是为了变成有钱人——是为了增加未来的选择权。每一份份额都是对未来说"不"的权力。定投积累的不是钱，是时间。</p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 延伸阅读 -->
+      <div class="edu-section">
+        <h3 class="edu-toggle text-base font-bold text-gray-900 mb-2" onclick="toggleEdu(this)">📚 延伸阅读</h3>
+        <div class="edu-body collapsed">
+          <div class="edu-card">
+            <h4>《小狗钱钱》</h4>
+            <p>理财启蒙经典。"养金鹅"的理念——每个月先存钱再花钱，让鹅慢慢长大下金蛋。72 法则教你快速估算资产翻倍时间。</p>
+          </div>
+          <div class="edu-card">
+            <h4>《纳瓦尔宝典》</h4>
+            <p>"拥有资产，而不是出卖时间。"定投指数基金就是普通人拥有经济资产最直接的路径。玩长期游戏，和长期的人玩。</p>
+          </div>
+          <div class="edu-card">
+            <h4>《金钱心理学》</h4>
+            <p>"财富是你看不见的那些。"真正的财富是没花掉、在积累的钱。复利需要时间，而时间需要你留在牌桌上。</p>
+          </div>
+          <div class="edu-card">
+            <h4>《牛奶可乐经济学》</h4>
+            <p>机会成本思维——今天花掉的钱放弃了未来增值的可能性。定投的本质是用今天的消费换未来的自由。</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">本工具仅供学习交流，不构成投资建议。基金有风险，投资需谨慎。</div>
+  </div>
+
+  <!-- ========== Page: Holdings (#/holdings) ========== -->
+  <div data-page="holdings">
+    <button class="back-btn" data-nav="#/">← 返回</button>
+    <h2 class="text-lg font-bold text-gray-900 mb-4">持仓管理</h2>
+
+    <!-- Summary -->
+    <div id="holdings-summary" class="bg-blue-50 rounded-lg p-3 mb-4 text-sm text-gray-700"></div>
+
+    <!-- ===== Section: 宽基指数基金 ===== -->
+    <div class="hr-section"></div>
+    <p class="text-sm font-semibold text-gray-800 mb-2">📊 宽基指数基金 <span id="core-count" class="text-gray-400 font-normal"></span></p>
+    <div id="core-list"></div>
+    <!-- Add form for 宽基 -->
+    <div class="inline-add-form" id="core-add-form">
+      <input type="text" class="add-code" placeholder="代码" maxlength="6">
+      <input type="text" class="add-name" placeholder="名称">
+      <select class="add-freq">
+        <option value="daily">每天</option>
+        <option value="weekly" selected>每周</option>
+        <option value="monthly">每月</option>
+      </select>
+      <input type="number" class="add-amount" placeholder="金额" min="0">
+      <button class="btn-sm add-submit" data-type="index">+ 添加</button>
+    </div>
+
+    <!-- ===== Section: 行业/主题基金 ===== -->
+    <div class="hr-section"></div>
+    <p class="text-sm font-semibold text-gray-800 mb-2">🎯 行业/主题基金 <span id="sector-count" class="text-gray-400 font-normal"></span></p>
+    <div id="sector-list"></div>
+    <!-- Add form for 行业 -->
+    <div class="inline-add-form" id="sector-add-form">
+      <input type="text" class="add-code" placeholder="代码" maxlength="6">
+      <input type="text" class="add-name" placeholder="名称">
+      <select class="add-freq">
+        <option value="daily">每天</option>
+        <option value="weekly" selected>每周</option>
+        <option value="monthly">每月</option>
+      </select>
+      <input type="number" class="add-amount" placeholder="金额" min="0">
+      <button class="btn-sm add-submit" data-type="sector">+ 添加</button>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">本工具仅供学习交流，不构成投资建议。基金有风险，投资需谨慎。</div>
+  </div>
+
+  <!-- ========== Page: Profile (#/profile) ========== -->
+  <div data-page="profile">
+    <button class="back-btn" data-nav="#/">← 返回</button>
+    <h2 class="text-lg font-bold text-gray-900 mb-4">投资画像</h2>
+
+    <!-- Profile display -->
+    <div id="profile-display" class="bg-blue-50 rounded-lg p-4 mb-4 text-sm text-gray-700"></div>
+
+    <!-- Re-evaluate button -->
+    <div class="text-center mb-4">
+      <button id="profile-eval-btn" class="btn-secondary text-center">🔄 重新评测</button>
+    </div>
+
+    <!-- Description -->
+    <p class="text-sm text-gray-500 mb-4">你的投资画像帮助 AI 更准确地给出个性化建议。</p>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">本工具仅供学习交流，不构成投资建议。基金有风险，投资需谨慎。</div>
+  </div>
+
+  <!-- ========== Page: Chat (#/chat) ========== -->
+  <div data-page="chat" class="chat-page">
+    <!-- Header -->
+    <div class="chat-header">
+      <div class="chat-header-top">
+        <div class="chat-header-left">
+          <button class="back-btn" data-nav="#/">← 返回</button>
+          <span class="text-sm font-semibold text-gray-800">Fund Coach</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="clear-btn" class="text-xs bg-gray-100 text-gray-500 border border-gray-200 rounded-full px-2.5 py-1.5 hover:bg-red-50 hover:text-red-500 hover:border-red-200" title="清空当前对话">🗑️</button>
+          <button id="history-btn" class="text-xs bg-gray-100 text-gray-700 border border-gray-200 rounded-full px-3 py-1.5 hover:bg-gray-200">📋 历史对话</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat area (scrollable) -->
+    <div id="chat-area" class="chat-area"></div>
+
+    <!-- Input area (fixed bottom) -->
+    <div class="input-area">
+      <!-- Quick action chips -->
+      <div class="flex items-center gap-1.5 mb-2 overflow-x-auto px-0.5">
+        <button class="chip-btn" data-prompt="分析我的持仓结构，核心-卫星配比是否合理">📊 分析持仓</button>
+        <button class="chip-btn" data-prompt="根据我的持仓，分析当前时局下我的核心-卫星结构是否合理，各宽基配比是否需要调整，以及我的卫星仓方向是否符合产业趋势">📈 时局解读</button>
+        <button class="chip-btn" data-prompt="我的定投计划需不需要调整">🎯 定投评估</button>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="msg-input" type="text" placeholder="输入问题..." class="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+        <button id="send-btn" class="bg-blue-600 text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">发送</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== History Drawer ========== -->
+  <div id="drawer-overlay" class="drawer-overlay"></div>
+  <div id="drawer" class="drawer">
+    <div class="drawer-header">
+      <span class="text-sm font-bold text-gray-800">历史对话</span>
+      <button id="drawer-close" class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+    </div>
+    <button id="drawer-new-btn" class="drawer-new-btn">＋ 新建对话</button>
+    <div id="drawer-list" class="drawer-list"></div>
+  </div>
+
+</div>
+
+<script>
+  // =====================================================================
+  //  Config
+  // =====================================================================
+  const LS_HOLDINGS = 'fund_holdings';
+  const LS_PROFILE = 'user_profile';
+
+  // =====================================================================
+  //  Hash Router
+  // =====================================================================
+  const routeMap = {
+    '/': 'home',
+    '/education': 'education',
+    '/holdings': 'holdings',
+    '/profile': 'profile',
+    '/chat': 'chat'
+  };
+
+  function route() {
+    const hash = location.hash.slice(1) || '/';
+    const qIdx = hash.indexOf('?');
+    const path = qIdx === -1 ? hash : hash.slice(0, qIdx);
+
+    const page = routeMap[path] || 'home';
+    if (path !== '/' && !routeMap[path]) {
+      location.hash = '#/';
+      return;
+    }
+
+    document.querySelectorAll('[data-page]').forEach(el => el.classList.remove('active'));
+    const target = document.querySelector(`[data-page="${page}"]`);
+    if (target) target.classList.add('active');
+    // refresh per page
+    if (page === 'holdings') renderHoldings();
+    if (page === 'profile') renderProfile();
+    if (page === 'chat') renderChat();
+  }
+
+  window.addEventListener('hashchange', route);
+  window.addEventListener('DOMContentLoaded', route);
+
+  // nav buttons
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-nav]');
+    if (btn) {
+      e.preventDefault();
+      location.hash = btn.dataset.nav;
+    }
+  });
+
+  // =====================================================================
+  //  Data & localStorage
+  // =====================================================================
+  let holdings = loadHoldings();
+
+  function loadHoldings() {
+    const raw = localStorage.getItem(LS_HOLDINGS);
+    if (!raw) return [];
+    try {
+      const data = JSON.parse(raw);
+      if (!Array.isArray(data)) return [];
+      return data.map(item => {
+        // backward compatibility: old format {fund_code, monthly_amount}
+        if (item.monthly_amount !== undefined && item.amount === undefined) {
+          return {
+            fund_code: item.fund_code,
+            fund_name: '',
+            amount: item.monthly_amount,
+            frequency: 'monthly',
+            type: 'index'
+          };
+        }
+        return {
+          fund_code: item.fund_code || '',
+          fund_name: item.fund_name || '',
+          amount: item.amount || 0,
+          frequency: item.frequency || 'monthly',
+          type: item.type || 'index'
+        };
+      });
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveHoldings() {
+    localStorage.setItem(LS_HOLDINGS, JSON.stringify(holdings));
+  }
+
+  // =====================================================================
+  //  Compute monthly total
+  // =====================================================================
+  function calcMonthlyTotal(list) {
+    const mult = { daily: 30, weekly: 4, monthly: 1 };
+    return list.reduce((sum, h) => sum + (h.amount || 0) * (mult[h.frequency] || 1), 0);
+  }
+
+  // =====================================================================
+  //  Profile from localStorage
+  // =====================================================================
+  function getUserProfile() {
+    try {
+      const p = JSON.parse(localStorage.getItem(LS_PROFILE));
+      return (p && p.risk_level) ? p.risk_level : '--';
+    } catch (_) {
+      return '--';
+    }
+  }
+
+  function getFullProfile() {
+    try {
+      return JSON.parse(localStorage.getItem(LS_PROFILE));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  let evalSession = { active: false, messages: [], loading: false };
+
+  function renderProfile() {
+    const el = document.getElementById('profile-display');
+    const btn = document.getElementById('profile-eval-btn');
+    const p = getFullProfile();
+
+    if (evalSession.active) {
+      // Render eval chat area
+      let html = '<div class="eval-area">';
+      for (const m of evalSession.messages) {
+        if (m.role === 'assistant') {
+          html += `<div class="eval-bubble-ai">${marked.parse(m.content)}</div>`;
+        }
+      }
+      if (evalSession.loading) {
+        html += '<div class="eval-loading"><span class="eval-dot"></span><span class="eval-dot"></span><span class="eval-dot"></span></div>';
+      }
+      // Input row（纯输入，去掉固定 chip）
+      html += '<div class="eval-input-row">';
+      html += '<input id="eval-input" type="text" placeholder="输入你的回答…">';
+      html += '<button id="eval-send-btn">发送</button>';
+      html += '</div></div>';
+      el.innerHTML = html;
+      if (btn) btn.textContent = '✕ 取消评测';
+
+      // Bind chip clicks
+      el.querySelectorAll('.eval-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          document.getElementById('eval-input').value = chip.dataset.reply;
+          evalSend();
+        });
+      });
+      // Bind send
+      document.getElementById('eval-send-btn').addEventListener('click', evalSend);
+      document.getElementById('eval-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') evalSend();
+      });
+      document.getElementById('eval-input').focus();
+      return;
+    }
+
+    // Normal display mode
+    if (!p || !p.risk_level) {
+      el.innerHTML = '<p class="text-gray-400">暂未评测</p><p class="text-gray-500 mt-2">点击下方按钮开始评测你的投资画像。</p>';
+      if (btn) btn.textContent = '📝 开始评测';
+      return;
+    }
+    const barColor = { '保守型':'#6b7280', '稳健型':'#2563eb', '平衡型':'#f59e0b', '进取型':'#f97316', '激进型':'#ef4444' };
+    const riskMap = { '保守型':0.2, '稳健型':0.4, '平衡型':0.6, '进取型':0.8, '激进型':1.0 };
+    const expMap = { '刚接触':0.2, '1年以内':0.4, '1-3年':0.6, '3-5年':0.8, '5年以上':1.0 };
+    let html = `
+      <div class="mb-1 score-bar-wrap"><span class="text-xs text-gray-500 w-16">风险等级</span>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:${riskMap[p.risk_level]*100}%;background:${barColor[p.risk_level]}"></div></div>
+        <span class="score-bar-label">${p.risk_level}</span></div>
+      <div class="mb-1 score-bar-wrap"><span class="text-xs text-gray-500 w-16">投资经验</span>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:${expMap[p.investment_experience]*100}%;background:#2563eb"></div></div>
+        <span class="score-bar-label">${p.investment_experience}</span></div>
+      <div class="mb-1"><span class="text-xs text-gray-500">投资目标：</span><span class="font-medium">${p.investment_goal}</span></div>
+      <div class="mt-2 text-xs text-gray-400">置信度 ${p.confidence? (p.confidence*100).toFixed(0)+'%' : '—'} · ${p.updated_at? new Date(p.updated_at).toLocaleString('zh-CN') : '—'} 更新</div>
+      <div class="mt-2 text-xs text-gray-500 italic">你的画像会随着对话自然优化，越用越准。</div>
+    `;
+    el.innerHTML = html;
+    if (btn) btn.textContent = '🔄 重新评测';
+  }
+
+  async function evalSend() {
+    const input = document.getElementById('eval-input');
+    if (!input || !input.value.trim() || evalSession.loading) return;
+    const text = input.value.trim();
+    input.value = '';
+    evalSession.messages.push({ role: 'user', content: text });
+    evalSession.loading = true;
+    renderProfile();
+
+    try {
+      const resp = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          holdings: JSON.parse(localStorage.getItem(LS_HOLDINGS) || '[]'),
+          user_profile: getFullProfile() || {},
+          conversation_history: evalSession.messages.slice(0, -1),
+          new_message: text,
+          mode: 'evaluate'
+        })
+      });
+      const data = await resp.json();
+      evalSession.messages.push({ role: 'assistant', content: data.reply || '' });
+
+      if (data.profile_update) {
+        const update = data.profile_update;
+        update.updated_at = new Date().toISOString();
+        localStorage.setItem(LS_PROFILE, JSON.stringify(update));
+        evalSession = { active: false, messages: [], loading: false };
+        renderProfile();
+        return;
+      }
+
+      evalSession.loading = false;
+      renderProfile();
+    } catch (err) {
+      evalSession.messages.push({ role: 'assistant', content: '服务暂时不可用，请稍后重试。' });
+      evalSession.loading = false;
+      renderProfile();
+    }
+  }
+
+  // =====================================================================
+  //  Render: Holdings Summary
+  // =====================================================================
+  function renderSummary() {
+    const el = document.getElementById('holdings-summary');
+    const count = holdings.length;
+    const monthly = calcMonthlyTotal(holdings);
+    const profile = getUserProfile();
+    const coreCount = holdings.filter(h => h.type === 'index').length;
+    const sectorCount = holdings.filter(h => h.type === 'sector').length;
+    el.textContent = `持仓: ${count}只基金 | 月投 ${monthly}元 | 画像: ${profile}`;
+    document.getElementById('core-count').textContent = coreCount > 0 ? `(${coreCount}只)` : '';
+    document.getElementById('sector-count').textContent = sectorCount > 0 ? `(${sectorCount}只)` : '';
+  }
+
+  // =====================================================================
+  //  Render: Holdings List (grouped by type)
+  // =====================================================================
+  function renderHoldings() {
+    renderSummary();
+
+    const coreList = document.getElementById('core-list');
+    const sectorList = document.getElementById('sector-list');
+
+    const coreItems = holdings.filter(h => h.type === 'index');
+    const sectorItems = holdings.filter(h => h.type === 'sector');
+
+    coreList.innerHTML = renderHoldingRows(coreItems);
+    sectorList.innerHTML = renderHoldingRows(sectorItems);
+
+    // bind events
+    [coreList, sectorList].forEach(list => {
+      list.querySelectorAll('.holding-row').forEach(row => {
+        const idx = parseInt(row.dataset.idx);
+        row.querySelectorAll('input, select').forEach(el => {
+          el.addEventListener('change', () => onEdit(idx, row));
+        });
+      });
+      list.querySelectorAll('.del-btn').forEach(btn => {
+        btn.addEventListener('click', () => onDelete(parseInt(btn.dataset.idx)));
+      });
+    });
+  }
+
+  function renderHoldingRows(items) {
+    if (items.length === 0) {
+      return '<p class="text-gray-400 text-xs py-2">暂无</p>';
+    }
+    return items.map((h, i) => {
+      const realIdx = holdings.indexOf(h);
+      return `
+        <div class="holding-row" data-idx="${realIdx}">
+          <input type="text" value="${escapeHtml(h.fund_code)}" class="edit-code" maxlength="6" placeholder="代码">
+          <input type="text" value="${escapeHtml(h.fund_name)}" class="edit-name" placeholder="名称">
+          <select class="edit-freq">
+            <option value="daily" ${h.frequency === 'daily' ? 'selected' : ''}>每天</option>
+            <option value="weekly" ${h.frequency === 'weekly' ? 'selected' : ''}>每周</option>
+            <option value="monthly" ${h.frequency === 'monthly' ? 'selected' : ''}>每月</option>
+          </select>
+          <input type="number" value="${h.amount}" class="edit-amount" min="0">
+          <span class="del-btn" data-idx="${realIdx}">×</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function onEdit(idx, row) {
+    const code = row.querySelector('.edit-code').value.trim();
+    const name = row.querySelector('.edit-name').value.trim();
+    const freq = row.querySelector('.edit-freq').value;
+    const amount = parseFloat(row.querySelector('.edit-amount').value) || 0;
+    // preserve existing type
+    holdings[idx] = { ...holdings[idx], fund_code: code, fund_name: name, amount, frequency: freq };
+    saveHoldings();
+    renderSummary();
+  }
+
+  function onDelete(idx) {
+    holdings.splice(idx, 1);
+    saveHoldings();
+    renderHoldings();
+  }
+
+  // =====================================================================
+  //  Add holding (delegated to per-section forms)
+  // =====================================================================
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.add-submit');
+    if (!btn) return;
+    const type = btn.dataset.type;
+    const form = btn.closest('.inline-add-form');
+    const code = form.querySelector('.add-code').value.trim();
+    const name = form.querySelector('.add-name').value.trim();
+    const freq = form.querySelector('.add-freq').value;
+    const amount = parseFloat(form.querySelector('.add-amount').value) || 0;
+
+    if (!code) { alert('请输入基金代码'); return; }
+    if (amount <= 0) { alert('请输入有效金额'); return; }
+
+    holdings.push({ fund_code: code, fund_name: name, type, amount, frequency: freq });
+    saveHoldings();
+    renderHoldings();
+
+    // clear form
+    form.querySelector('.add-code').value = '';
+    form.querySelector('.add-name').value = '';
+    form.querySelector('.add-amount').value = '';
+    form.querySelector('.add-freq').value = 'weekly';
+  });
+
+  // =====================================================================
+  //  Chat State — Multi-Conversation
+  // =====================================================================
+  const LS_CONVERSATIONS = 'fund_conversations';
+  const LS_HISTORY_OLD = 'chat_history'; // for backward compat
+
+  // Generate simple ID
+  function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  function loadConversations() {
+    // Check for old single-chat data
+    const oldRaw = localStorage.getItem(LS_HISTORY_OLD);
+    let data;
+    try {
+      data = JSON.parse(localStorage.getItem(LS_CONVERSATIONS));
+    } catch (_) { data = null; }
+
+    if (data && data.convs && data.active_id) {
+      // Migrate old data if exists
+      if (oldRaw && !data._migrated) {
+        try {
+          const oldMsgs = JSON.parse(oldRaw);
+          if (Array.isArray(oldMsgs) && oldMsgs.length > 0) {
+            const firstConv = data.convs[data.active_id];
+            if (firstConv && firstConv.messages.length === 0) {
+              firstConv.messages = oldMsgs;
+              firstConv.title = oldMsgs[0]?.content?.slice(0, 20) || '对话';
+              data._migrated = true;
+              localStorage.removeItem(LS_HISTORY_OLD);
+            }
+          }
+        } catch (_) {}
+      }
+      return data;
+    }
+
+    // Fresh start
+    const defaultConv = { title: '对话 1', messages: [], created_at: Date.now() };
+    const active_id = genId();
+    const result = { convs: { [active_id]: defaultConv }, active_id, _migrated: false };
+
+    // Migrate old single chat
+    if (oldRaw) {
+      try {
+        const oldMsgs = JSON.parse(oldRaw);
+        if (Array.isArray(oldMsgs) && oldMsgs.length > 0) {
+          result.convs[active_id].messages = oldMsgs;
+          result.convs[active_id].title = oldMsgs[0]?.content?.slice(0, 20) || '对话';
+          result._migrated = true;
+          localStorage.removeItem(LS_HISTORY_OLD);
+        }
+      } catch (_) {}
+    }
+
+    return result;
+  }
+
+  function saveConversations() {
+    localStorage.setItem(LS_CONVERSATIONS, JSON.stringify(convData));
+  }
+
+  let convData = loadConversations();
+
+  function getActiveConv() {
+    return convData.convs[convData.active_id] || null;
+  }
+
+  function getActiveMessages() {
+    const conv = getActiveConv();
+    return conv ? conv.messages : [];
+  }
+
+  function setActiveMessages(msgs) {
+    const conv = getActiveConv();
+    if (conv) {
+      conv.messages = msgs;
+      saveConversations();
+    }
+  }
+
+  function switchConversation(id) {
+    if (!convData.convs[id]) return;
+    convData.active_id = id;
+    saveConversations();
+    renderChat();
+  }
+
+  function newConversation() {
+    const id = genId();
+    const num = Object.keys(convData.convs).length + 1;
+    convData.convs[id] = { title: `对话 ${num}`, messages: [], created_at: Date.now() };
+    convData.active_id = id;
+    saveConversations();
+    renderChat();
+    closeDrawer();
+  }
+
+  function deleteConversation(id) {
+    const keys = Object.keys(convData.convs);
+    if (keys.length <= 1) {
+      // Clear messages instead of deleting last conv
+      convData.convs[id].messages = [];
+      if (convData.active_id === id) {
+        renderChat();
+      }
+      saveConversations();
+      renderDrawerList();
+      return;
+    }
+    delete convData.convs[id];
+    if (convData.active_id === id) {
+      // Switch to another conversation
+      const remaining = Object.keys(convData.convs);
+      convData.active_id = remaining[0];
+    }
+    saveConversations();
+    renderChat();
+    renderDrawerList();
+  }
+
+  function clearActiveConversation() {
+    const conv = getActiveConv();
+    if (conv) {
+      conv.messages = [];
+      saveConversations();
+      renderChat();
+    }
+  }
+
+  function updateActiveTitle() {
+    const conv = getActiveConv();
+    if (!conv || conv.messages.length === 0) return;
+    const firstMsg = conv.messages.find(m => m.role === 'user');
+    if (firstMsg) {
+      conv.title = firstMsg.content.slice(0, 20) + (firstMsg.content.length > 20 ? '...' : '');
+    }
+  }
+
+  let isSending = false;
+
+  // =====================================================================
+  //  Drawer controls
+  // =====================================================================
+  function openDrawer() {
+    document.getElementById('drawer').classList.add('open');
+    document.getElementById('drawer-overlay').classList.add('open');
+    renderDrawerList();
+  }
+
+  function closeDrawer() {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('drawer-overlay').classList.remove('open');
+  }
+
+  function renderDrawerList() {
+    const list = document.getElementById('drawer-list');
+    const entries = Object.entries(convData.convs);
+    // Sort by created_at descending
+    entries.sort((a, b) => b[1].created_at - a[1].created_at);
+
+    if (entries.length === 0) {
+      list.innerHTML = '<p class="text-gray-400 text-sm text-center pt-8">暂无历史对话</p>';
+      return;
+    }
+
+    list.innerHTML = entries.map(([id, conv]) => `
+      <div class="drawer-item ${id === convData.active_id ? 'active' : ''}" data-conv-id="${id}">
+        <span class="truncate">${escapeHtml(conv.title || '新对话')}</span>
+        <span class="del" data-del-id="${id}">×</span>
+      </div>
+    `).join('');
+
+    // Click to switch
+    list.querySelectorAll('.drawer-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.classList.contains('del')) return;
+        const id = el.dataset.convId;
+        if (id && id !== convData.active_id) {
+          switchConversation(id);
+        }
+        closeDrawer();
+      });
+    });
+
+    // Delete
+    list.querySelectorAll('.del').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteConversation(el.dataset.delId);
+      });
+    });
+  }
+
+  // =====================================================================
+  //  Render: Chat
+  // =====================================================================
+  function renderChat() {
+    const chatArea = document.getElementById('chat-area');
+    if (!chatArea) return;
+    const messages = getActiveMessages();
+
+    // Empty state: show first-time prompt or placeholder
+    if (messages.length === 0) {
+      const profile = getFullProfile();
+      const hasValidProfile = profile && profile.risk_level && profile.risk_level !== '未评测';
+      if (!hasValidProfile) {
+        chatArea.innerHTML = `
+          <div class="welcome-prompt">
+            <p>欢迎来到 Fund Coach！你还没做过投资评测，<a href="#/profile" style="color:#2563eb;text-decoration:underline;">去投资画像页</a>做一下评测，AI 的分析会更准。</p>
+            <button class="wp-btn-skip" id="wp-skip-btn">跳过，直接对话</button>
+          </div>
+        `;
+        document.getElementById('wp-skip-btn').addEventListener('click', function onClick() {
+          chatArea.innerHTML = '<div class="flex-1 flex items-center justify-center text-gray-400 text-sm pt-16">输入问题开始与 Fund Coach 对话</div>';
+        });
+        return;
+      }
+      chatArea.innerHTML = '<div class="flex-1 flex items-center justify-center text-gray-400 text-sm pt-16">输入问题开始与 Fund Coach 对话</div>';
+      return;
+    }
+
+    let html = '';
+    messages.forEach(msg => {
+      const cls = msg.role === 'user' ? 'bubble-user' : 'bubble-ai';
+      const content = msg.role === 'user' ? escapeHtml(msg.content) : marked.parse(msg.content);
+      html += `<div class="${cls}">${content}</div>`;
+    });
+    chatArea.innerHTML = html;
+    scrollToBottom();
+  }
+
+  function appendBubble(role, content) {
+    const chatArea = document.getElementById('chat-area');
+    const ph = chatArea.querySelector('.flex-1.flex.items-center');
+    if (ph) ph.remove();
+    const cls = role === 'user' ? 'bubble-user' : 'bubble-ai';
+    const div = document.createElement('div');
+    div.className = cls;
+    if (role === 'user') {
+      div.textContent = content;
+    } else {
+      div.innerHTML = marked.parse(content);
+    }
+    chatArea.appendChild(div);
+    scrollToBottom();
+  }
+
+  function showLoading() {
+    const chatArea = document.getElementById('chat-area');
+    const div = document.createElement('div');
+    div.className = 'bubble-ai';
+    div.id = 'loading-bubble';
+    div.innerHTML = '<span class="loading-dots">思考中</span>';
+    chatArea.appendChild(div);
+    scrollToBottom();
+  }
+
+  function removeLoading() {
+    const el = document.getElementById('loading-bubble');
+    if (el) el.remove();
+  }
+
+  function scrollToBottom() {
+    const chatArea = document.getElementById('chat-area');
+    setTimeout(() => { chatArea.scrollTop = chatArea.scrollHeight; }, 50);
+  }
+
+  // =====================================================================
+  //  Send message
+  // =====================================================================
+  async function sendMessage() {
+    const input = document.getElementById('msg-input');
+    const sendBtn = document.getElementById('send-btn');
+    const text = input.value.trim();
+    if (!text || isSending) return;
+
+    // Ensure active conv exists
+    if (!getActiveConv()) {
+      newConversation();
+    }
+
+    appendBubble('user', text);
+    input.value = '';
+    input.disabled = true;
+    sendBtn.disabled = true;
+    isSending = true;
+
+    const messages = getActiveMessages();
+    messages.push({ role: 'user', content: text });
+    // Auto-set title from first user message
+    if (messages.filter(m => m.role === 'user').length === 1) {
+      updateActiveTitle();
+    }
+    setActiveMessages(messages);
+    showLoading();
+
+    try {
+      const holdings = JSON.parse(localStorage.getItem(LS_HOLDINGS) || '[]');
+      let userProfile = {};
+      try { userProfile = JSON.parse(localStorage.getItem(LS_PROFILE) || '{}'); } catch (_) {}
+      const convHistory = messages.slice(0, -1).filter(m => m.role !== 'system');
+
+      const resp = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          holdings: holdings,
+          user_profile: userProfile,
+          conversation_history: convHistory,
+          new_message: text
+        })
+      });
+      const data = await resp.json();
+      const reply = data.reply || '抱歉，暂时无法获取回复。';
+
+      if (data.profile_update) {
+        const update = data.profile_update;
+        update.updated_at = new Date().toISOString();
+        localStorage.setItem(LS_PROFILE, JSON.stringify(update));
+      }
+
+      removeLoading();
+      appendBubble('assistant', reply);
+      const msgs = getActiveMessages();
+      msgs.push({ role: 'assistant', content: reply });
+      setActiveMessages(msgs);
+    } catch (err) {
+      removeLoading();
+      const errMsg = '抱歉，网络连接失败，请检查后端服务是否运行。';
+      appendBubble('assistant', errMsg);
+      const msgs = getActiveMessages();
+      msgs.push({ role: 'assistant', content: errMsg });
+      setActiveMessages(msgs);
+    } finally {
+      input.disabled = false;
+      sendBtn.disabled = false;
+      isSending = false;
+      input.focus();
+    }
+  }
+
+  // =====================================================================
+  // Chat event listeners
+  // =====================================================================
+  document.getElementById('send-btn').addEventListener('click', sendMessage);
+  document.getElementById('msg-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  // Quick action chips
+  document.querySelectorAll('.chip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById('msg-input');
+      input.value = btn.dataset.prompt;
+      input.focus();
+    });
+  });
+  document.getElementById('history-btn').addEventListener('click', openDrawer);
+  document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+  document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
+  document.getElementById('drawer-new-btn').addEventListener('click', newConversation);
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    if (confirm('确定清空当前对话？')) {
+      clearActiveConversation();
+    }
+  });
+
+  // Profile eval button
+  document.getElementById('profile-eval-btn').addEventListener('click', () => {
+    if (!evalSession.active) {
+      // Start eval: send initial message to backend
+      evalSession = { active: true, messages: [], loading: true };
+      renderProfile();
+      fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+           holdings: JSON.parse(localStorage.getItem(LS_HOLDINGS) || '[]'),
+           user_profile: getFullProfile() || {},
+          conversation_history: [],
+          new_message: '开始评测',
+          mode: 'evaluate'
+        })
+      }).then(r => r.json()).then(data => {
+        evalSession.messages.push({ role: 'assistant', content: data.reply || '' });
+        if (data.profile_update) {
+          const update = data.profile_update;
+          update.updated_at = new Date().toISOString();
+          localStorage.setItem(LS_PROFILE, JSON.stringify(update));
+          evalSession = { active: false, messages: [], loading: false };
+        } else {
+          evalSession.loading = false;
+        }
+        renderProfile();
+      }).catch(() => {
+        evalSession.messages.push({ role: 'assistant', content: '服务暂时不可用，请稍后重试。' });
+        evalSession.loading = false;
+        renderProfile();
+      });
+    } else {
+      // Cancel eval
+      evalSession = { active: false, messages: [], loading: false };
+      renderProfile();
+    }
+  });
+
+  // =====================================================================
+  //  Utilities + Edu toggle
+  // =====================================================================
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function toggleEdu(el) {
+    el.classList.toggle('open');
+    const body = el.nextElementSibling;
+    if (body) body.classList.toggle('collapsed');
+  }
+
+  // =====================================================================
+  //  Init
+  // =====================================================================
+  route();
+</script>
+</body>
+</html>
