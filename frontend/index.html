@@ -1010,7 +1010,7 @@
       try { userProfile = JSON.parse(localStorage.getItem(LS_PROFILE) || '{}'); } catch (_) {}
       const convHistory = messages.slice(0, -1).filter(m => m.role !== 'system');
 
-      const resp = await fetch('http://localhost:8000/api/chat', {
+      const resp = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1083,7 +1083,7 @@
       // Start eval: send initial message to backend
       evalSession = { active: true, messages: [], loading: true };
       renderProfile();
-      fetch('http://localhost:8000/api/chat', {
+      fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
